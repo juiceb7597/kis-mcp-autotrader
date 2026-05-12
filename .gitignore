@@ -1,0 +1,8 @@
+# 1. 한국투자증권 API 자격 증명
+/MCP/.env
+
+# 2. 주식 매매 보고서 수신 이메일
+/n8n/.env
+
+# 3. Gemini API Key
+/n8n-runner/config/.env

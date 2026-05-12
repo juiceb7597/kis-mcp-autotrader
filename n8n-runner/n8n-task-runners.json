@@ -1,0 +1,58 @@
+{
+  "task-runners": [
+    {
+      "runner-type": "javascript",
+      "command": "/usr/local/bin/node",
+      "args": [
+        "--disallow-code-generation-from-strings",
+        "--disable-proto=delete",
+        "/opt/runners/task-runner-javascript/dist/start.js"
+      ],
+      "workdir": "/opt/runners/task-runner-javascript",
+      "health-check-server-port": "5681",
+			"allowed-env": [
+				"PATH",
+				"GENERIC_TIMEZONE",
+				"NODE_OPTIONS",
+				"NODE_PATH",
+				"N8N_RUNNERS_AUTO_SHUTDOWN_TIMEOUT",
+				"N8N_RUNNERS_TASK_TIMEOUT",
+				"N8N_RUNNERS_MAX_CONCURRENCY",
+				"N8N_SENTRY_DSN",
+				"N8N_VERSION",
+				"ENVIRONMENT",
+				"DEPLOYMENT_NAME",
+				"HOME"
+			],
+      "env-overrides": {
+        "NODE_FUNCTION_ALLOW_BUILTIN": "*",
+        "NODE_FUNCTION_ALLOW_EXTERNAL": "*"
+      }
+    },
+    {
+      "runner-type": "python",
+      "command": "/opt/runners/task-runner-python/.venv/bin/python",
+      "args": ["-B", "-X", "disable_remote_debug", "-m", "src.main"],
+      "workdir": "/opt/runners/task-runner-python",
+      "health-check-server-port": "5682",
+			"allowed-env": [
+				"PATH",
+				"N8N_RUNNERS_LAUNCHER_LOG_LEVEL",
+				"N8N_RUNNERS_AUTO_SHUTDOWN_TIMEOUT",
+				"N8N_RUNNERS_TASK_TIMEOUT",
+				"N8N_RUNNERS_MAX_CONCURRENCY",
+				"N8N_SENTRY_DSN",
+				"N8N_VERSION",
+				"ENVIRONMENT",
+				"DEPLOYMENT_NAME",
+				"GOOGLE_API_KEY"
+			],
+      "env-overrides": {
+        "PYTHONPATH": "/opt/runners/task-runner-python:/opt/runners/task-runner-python/.venv/lib/python3.12/site-packages",
+        "VIRTUAL_ENV": "/opt/runners/task-runner-python/.venv",
+        "N8N_RUNNERS_STDLIB_ALLOW": "*",
+        "N8N_RUNNERS_EXTERNAL_ALLOW": "*"
+      }
+    }
+  ]
+}

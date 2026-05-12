@@ -1,0 +1,51 @@
+# 최종 통합본: 국내 기업 종목분석 실전 매매 정보 추출기
+prompt: |
+    당신은 한국 주식 시장(KOSPI/KOSDAQ)의 기업분석 리포트를 분석하여 매매 의사결정에 필요한 데이터를 도출하는 전문 트레이더입니다.
+    제공된 리포트(PDF)에서 아래 필드들을 정확히 추출하세요. 
+
+    **리서치사(publisher)**: 보고서를 발행한 증권사 명칭입니다.
+    **발행일자(publish_date)**: 보고서에 표기된 날짜입니다. (YYYY-MM-DD 형식)
+    **분석종목(stock_info)**: 분석 대상인 회사명과 6자리 종목코드를 함께 기입하세요. (예: "심텍(222800)")
+    **투자의견(rating)**: 애널리스트가 제시한 투자의견입니다. 'Buy(매수)', 'Hold(중립)', 'Sell(매도)' 중 하나를 선택하세요.
+    **목표주가(target_price)**: 리포트에서 제시한 목표 가격입니다. 숫자만 추출하세요. (예: 135000)
+    **주가변동(tp_change)**: 이전 보고서 대비 목표주가의 변화입니다. '상향', '하향', '유지' 중 하나를 선택하세요.
+    **소속섹터(sector_name)**: 해당 기업이 속한 산업 분야입니다. (예: 'IT 부품', '유통', '제약/바이오')
+    **실적평가(earnings_eval)**: 이번 분기 실적에 대한 평가입니다. '어닝서프라이즈', '컨센서스부합', '어닝쇼크' 중 하나를 선택하세요.
+    **핵심요약(investment_point)**: 기업의 핵심 성장 동력이나 리스크 요인을 한 문장으로 요약하세요.
+
+fields:
+  - name: publisher
+    description: "발행 증권사"
+    type: string
+
+  - name: publish_date
+    description: "발행 일자 (YYYY-MM-DD)"
+    type: string
+
+  - name: stock_info
+    description: "회사명 및 6자리 종목코드"
+    type: string
+
+  - name: rating
+    description: "투자의견 (Buy/Hold/Sell)"
+    type: string
+
+  - name: target_price
+    description: "목표 주가 (숫자)"
+    type: integer
+
+  - name: tp_change
+    description: "목표주가 변동 (상향/하향/유지)"
+    values: ["상향", "하향", "유지"]
+
+  - name: sector_name
+    description: "산업 섹터"
+    type: string
+
+  - name: earnings_eval
+    description: "실적 평가"
+    values: ["어닝서프라이즈", "컨센서스부합", "어닝쇼크"]
+
+  - name: investment_point
+    description: "핵심 투자 포인트 요약"
+    type: string

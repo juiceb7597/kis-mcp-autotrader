@@ -1,0 +1,60 @@
+# ====================================================================
+# [Stage 1] 공식 이미지에서 소스 및 런처 바이너리 파밍
+# ====================================================================
+FROM n8nio/runners:latest AS builder
+
+# ====================================================================
+# [Stage 2] Debian 기반 Python 3.13 Slim
+# ====================================================================
+FROM python:3.13-slim
+
+# 1. 필수 패키지 및 Node.js 설치 (tini 포함)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl build-essential ca-certificates tini \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir uv
+
+# 2. 런처의 하드코딩 경로(Alpine Node)를 Debian Node 경로로 연결
+RUN ln -s /usr/bin/node /usr/local/bin/node
+
+# 3. 런처 바이너리 복사
+COPY --from=builder /usr/local/bin/task-runner-launcher /usr/local/bin/task-runner-launcher
+
+# 4. 러너 소스 코드 복사
+COPY --from=builder /opt/runners /opt/runners
+
+# 로컬(호스트)에 있는 커스텀 설정 파일을 컨테이너로 복사
+COPY n8n-task-runners.json /etc/n8n-task-runners.json
+
+# 5. src 복구
+WORKDIR /opt/runners/task-runner-python
+RUN cp -a build/lib/src ./src && \
+    rm -rf .venv && \
+    uv venv .venv && \
+    uv pip install -e .
+
+# 6. 의존성 설치
+RUN uv pip install --no-cache-dir \
+    websockets \
+    "ragwire[google]" \
+    fastembed \
+    python-dotenv
+
+# 7. 권한 부여 (로컬에서 복사한 설정 파일도 runner 유저가 읽을 수 있게 소유권 변경)
+RUN useradd -m -d /home/runner runner && \
+    chown -R runner:runner /opt/runners /home/runner /etc/n8n-task-runners.json
+
+# 8. 환경 변수 세팅
+ENV VIRTUAL_ENV=/opt/runners/task-runner-python/.venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+ENV PYTHONPATH=/opt/runners/task-runner-python
+ENV NODE_ENV=production
+
+USER runner
+EXPOSE 5680
+
+# 9. 부팅 시퀀스
+ENTRYPOINT ["tini", "--", "/usr/local/bin/task-runner-launcher"]
+CMD ["javascript", "python"]

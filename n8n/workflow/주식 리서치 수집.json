@@ -1,0 +1,1420 @@
+{
+  "name": "주식 리서치 수집",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<report>\n{{ $json.data }}\n</report>",
+        "options": {
+          "systemMessage": "너는 주식 리포트 URL을 추출하는 API 서버야.\n\n[지시사항]\n1. <report> 태그 안에서 PDF URL만 모두 추출한다.\n2. 반드시 유효한 JSON 형식으로만 응답한다.\n3. 어떠한 설명, 인사말, 마크다운 코드블록(```json)도 절대 포함하지 마라.\n4. 응답은 반드시 '{'로 시작해서 '}'로 끝나야 한다.\n5. 결과값에 줄바꿈 기호(\\n)나 이스케이프 문자를 넣지 말고, 순수 데이터만 출력하라.\n\n[출력 형식]\n{\"urls\":[\"링크1\",\"링크2\"]}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        832,
+        -48
+      ],
+      "id": "5563b4aa-0b8f-4efa-b985-0b56c9266a03",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 2026년 한국 공휴일 목록 (이미지 참고 반영)\nconst holidays2026 = [\n  \"2026-01-01\", // 신정\n  \"2026-02-16\", \"2026-02-17\", \"2026-02-18\", // 설날 연휴\n  \"2026-03-01\", \"2026-03-02\", // 3.1절 및 대체공휴일\n  \"2026-05-05\", // 어린이날\n  \"2026-05-24\", \"2026-05-25\", // 부처님 오신 날 및 대체공휴일\n  \"2026-06-06\", // 현충일\n  \"2026-08-15\", \"2026-08-17\", // 광복절 및 대체공휴일\n  \"2026-09-24\", \"2026-09-25\", \"2026-09-26\", // 추석 연휴\n  \"2026-10-03\", \"2026-10-05\", // 개천절 및 대체공휴일\n  \"2026-10-09\", // 한글날\n  \"2026-12-25\", // 크리스마스\n];\n\n// 현재 시간 기준 KST(한국 표준시) 계산\nconst now = new Date();\nconst kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));\n\nconst year = kstDate.getUTCFullYear();\nconst month = String(kstDate.getUTCMonth() + 1).padStart(2, '0');\nconst day = String(kstDate.getUTCDate()).padStart(2, '0');\nconst dateString = `${year}-${month}-${day}`;\n\nconst hours = kstDate.getUTCHours();\nconst minutes = kstDate.getUTCMinutes();\nconst dayOfWeek = kstDate.getUTCDay(); // 0: 일요일, 6: 토요일\n\n// 1. 주말 체크\nconst isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);\n\n// 2. 공휴일 체크\nconst isHoliday = holidays2026.includes(dateString);\n\n// 3. 업무 시간 체크 (08:30 ~ 18:30)\nconst currentTimeInMinutes = (hours * 60) + minutes;\nconst startMinutes = (8 * 60) + 30;\nconst endMinutes = (18 * 60) + 30;\nconst isBusinessHours = (currentTimeInMinutes >= startMinutes && currentTimeInMinutes <= endMinutes);\n\n// 최종 실행 여부 결정\nconst shouldRun = !isWeekend && !isHoliday && isBusinessHours;\n\nreturn {\n  shouldRun,\n  status: shouldRun ? \"정상 작동\" : \"중단 (주말/휴일/시간외)\",\n  debug: {\n    kstTime: `${hours}:${minutes}`,\n    date: dateString,\n    day: [\"일\", \"월\", \"화\", \"수\", \"목\", \"금\", \"토\"][dayOfWeek]\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        -32
+      ],
+      "id": "e44f8c42-0ace-40fc-b821-d2dd5feff9dc",
+      "name": "시간 확인(26년)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "15fc0bbc-70dc-4e69-b7b2-3f39bece14a3",
+              "leftValue": "={{ $json.shouldRun }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        -32
+      ],
+      "id": "6287d3d3-2280-4730-9097-3496d6d8f6e3",
+      "name": "실행 여부"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        832,
+        128
+      ],
+      "id": "8335441c-14c8-4f1f-8bf7-a69b617e342a",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ab6gK9S7PzkIz7ya",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1296,
+        -48
+      ],
+      "id": "645129ad-afc8-4a2b-8517-e76f6fa095e7",
+      "name": "PDF 다운로드",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// AI가 내뱉은 텍스트(output)를 가져옵니다.\nconst rawText = $input.item.json.output;\n\ntry {\n  // 1. JSON 파싱\n  const parsedData = JSON.parse(rawText);\n  \n  // 2. urls 배열 내의 각 링크를 n8n이 인식할 수 있는 개별 아이템 형태로 변환\n  // [ { json: { url: \"링크1\" } }, { json: { url: \"링크2\" } } ] 형태로 반환됩니다.\n  return parsedData.urls.map(url => {\n    return {\n      url: url\n    };\n  });\n\n} catch (error) {\n  // 에러 발생 시 추적을 위해 원본 텍스트 반환\n  return [{\n    error: \"JSON 파싱 실패\",\n    rawText: rawText\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        -48
+      ],
+      "id": "4890c8d6-c44b-47a2-b0e2-aabbaf1c2e6c",
+      "name": "URL 파싱"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "import os\nimport tempfile\nimport base64\nfrom dotenv import load_dotenv\nfrom ragwire import RAGWire, setup_logging\n\n# 환경 설정\nload_dotenv(\"/config/.env\")\n\nlogger = setup_logging(log_level=\"INFO\")\nrag = RAGWire('/config/invest_config.yaml') \n\nfinal_results = []\n\nfor i, item in enumerate(_items):\n    f_name = \"unknown\"\n    tmp_path = None\n    file_size_mb = 0\n    try:\n        # 1. 데이터 가져오기\n        json_data = item.get('json', {})\n        b64_string = json_data.get('data')\n        f_name = json_data.get('fileName', f'doc_{i}.pdf')\n\n        if not b64_string:\n            continue\n\n        # 2. 파일 복원\n        file_bytes = base64.b64decode(b64_string)\n\n        # 3. 임시 파일 저장 및 용량 계산\n        with tempfile.NamedTemporaryFile(delete=False, suffix=\".pdf\") as tmp:\n            tmp.write(file_bytes)\n            tmp_path = tmp.name\n            \n        # 파일 크기 측정 (Bytes -> MB)\n        size_bytes = os.path.getsize(tmp_path)\n        file_size_mb = round(size_bytes / (1024 * 1024), 2)\n\n        # 4. RAG 주입\n        stats = rag.ingest_documents([tmp_path])\n\n        # 5. 결과 기록\n        final_results.append({\n            \"status\": \"success\",\n            \"file_name\": f_name,\n            \"file_size\": f\"{file_size_mb} MB\",\n            \"stats\": stats\n        })\n\n    except Exception as e:\n        final_results.append({\n            \"status\": \"error\",\n            \"file_name\": f_name,\n            \"message\": str(e)\n        })\n\n    finally:\n        # 즉시 삭제\n        if tmp_path and os.path.exists(tmp_path):\n            os.remove(tmp_path)\n\nreturn final_results"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        -48
+      ],
+      "id": "c998e077-9844-4701-ac73-9915bf73edb7",
+      "name": "RAGWire"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<report>\n{{ $json.data }}\n</report>",
+        "options": {
+          "systemMessage": "너는 주식 리포트 URL을 추출하는 API 서버야.\n\n[지시사항]\n1. <report> 태그 안에서 PDF URL만 모두 추출한다.\n2. 반드시 유효한 JSON 형식으로만 응답한다.\n3. 어떠한 설명, 인사말, 마크다운 코드블록(```json)도 절대 포함하지 마라.\n4. 응답은 반드시 '{'로 시작해서 '}'로 끝나야 한다.\n5. 결과값에 줄바꿈 기호(\\n)나 이스케이프 문자를 넣지 말고, 순수 데이터만 출력하라.\n\n[출력 형식]\n{\"urls\":[\"링크1\",\"링크2\"]}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        816,
+        256
+      ],
+      "id": "19adcd4f-c245-4370-905c-e880ec1108cd",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 2026년 한국 공휴일 목록 (이미지 참고 반영)\nconst holidays2026 = [\n  \"2026-01-01\", // 신정\n  \"2026-02-16\", \"2026-02-17\", \"2026-02-18\", // 설날 연휴\n  \"2026-03-01\", \"2026-03-02\", // 3.1절 및 대체공휴일\n  \"2026-05-05\", // 어린이날\n  \"2026-05-24\", \"2026-05-25\", // 부처님 오신 날 및 대체공휴일\n  \"2026-06-06\", // 현충일\n  \"2026-08-15\", \"2026-08-17\", // 광복절 및 대체공휴일\n  \"2026-09-24\", \"2026-09-25\", \"2026-09-26\", // 추석 연휴\n  \"2026-10-03\", \"2026-10-05\", // 개천절 및 대체공휴일\n  \"2026-10-09\", // 한글날\n  \"2026-12-25\", // 크리스마스\n];\n\n// 현재 시간 기준 KST(한국 표준시) 계산\nconst now = new Date();\nconst kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));\n\nconst year = kstDate.getUTCFullYear();\nconst month = String(kstDate.getUTCMonth() + 1).padStart(2, '0');\nconst day = String(kstDate.getUTCDate()).padStart(2, '0');\nconst dateString = `${year}-${month}-${day}`;\n\nconst hours = kstDate.getUTCHours();\nconst minutes = kstDate.getUTCMinutes();\nconst dayOfWeek = kstDate.getUTCDay(); // 0: 일요일, 6: 토요일\n\n// 1. 주말 체크\nconst isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);\n\n// 2. 공휴일 체크\nconst isHoliday = holidays2026.includes(dateString);\n\n// 3. 업무 시간 체크 (08:30 ~ 18:30)\nconst currentTimeInMinutes = (hours * 60) + minutes;\nconst startMinutes = (8 * 60) + 30;\nconst endMinutes = (18 * 60) + 30;\nconst isBusinessHours = (currentTimeInMinutes >= startMinutes && currentTimeInMinutes <= endMinutes);\n\n// 최종 실행 여부 결정\nconst shouldRun = !isWeekend && !isHoliday && isBusinessHours;\n\nreturn {\n  shouldRun,\n  status: shouldRun ? \"정상 작동\" : \"중단 (주말/휴일/시간외)\",\n  debug: {\n    kstTime: `${hours}:${minutes}`,\n    date: dateString,\n    day: [\"일\", \"월\", \"화\", \"수\", \"목\", \"금\", \"토\"][dayOfWeek]\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        272
+      ],
+      "id": "c323c350-37c8-49b7-8c62-747bfac736db",
+      "name": "시간 확인(26년)1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "15fc0bbc-70dc-4e69-b7b2-3f39bece14a3",
+              "leftValue": "={{ $json.shouldRun }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        432,
+        272
+      ],
+      "id": "c81886fb-17ab-4773-a06e-08a605de7bc0",
+      "name": "실행 여부1"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        816,
+        432
+      ],
+      "id": "875a379a-2e89-4cb4-9619-aaa42cf53123",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ab6gK9S7PzkIz7ya",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1280,
+        256
+      ],
+      "id": "8b3318cf-9c95-4246-b27a-755a159c22ef",
+      "name": "PDF 다운로드1",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// AI가 내뱉은 텍스트(output)를 가져옵니다.\nconst rawText = $input.item.json.output;\n\ntry {\n  // 1. JSON 파싱\n  const parsedData = JSON.parse(rawText);\n  \n  // 2. urls 배열 내의 각 링크를 n8n이 인식할 수 있는 개별 아이템 형태로 변환\n  // [ { json: { url: \"링크1\" } }, { json: { url: \"링크2\" } } ] 형태로 반환됩니다.\n  return parsedData.urls.map(url => {\n    return {\n      url: url\n    };\n  });\n\n} catch (error) {\n  // 에러 발생 시 추적을 위해 원본 텍스트 반환\n  return [{\n    error: \"JSON 파싱 실패\",\n    rawText: rawText\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        256
+      ],
+      "id": "ba62342e-9f99-4f3e-aa9a-0e4f26477ba7",
+      "name": "URL 파싱1"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "import os\nimport tempfile\nimport base64\nfrom dotenv import load_dotenv\nfrom ragwire import RAGWire, setup_logging\n\n# 환경 설정\nload_dotenv(\"/config/.env\")\n\nlogger = setup_logging(log_level=\"INFO\")\nrag = RAGWire('/config/analysis_config.yaml') \n\nfinal_results = []\n\nfor i, item in enumerate(_items):\n    f_name = \"unknown\"\n    tmp_path = None\n    file_size_mb = 0\n    try:\n        # 1. 데이터 가져오기\n        json_data = item.get('json', {})\n        b64_string = json_data.get('data')\n        f_name = json_data.get('fileName', f'doc_{i}.pdf')\n\n        if not b64_string:\n            continue\n\n        # 2. 파일 복원\n        file_bytes = base64.b64decode(b64_string)\n\n        # 3. 임시 파일 저장 및 용량 계산\n        with tempfile.NamedTemporaryFile(delete=False, suffix=\".pdf\") as tmp:\n            tmp.write(file_bytes)\n            tmp_path = tmp.name\n            \n        # 파일 크기 측정 (Bytes -> MB)\n        size_bytes = os.path.getsize(tmp_path)\n        file_size_mb = round(size_bytes / (1024 * 1024), 2)\n\n        # 4. RAG 주입\n        stats = rag.ingest_documents([tmp_path])\n\n        # 5. 결과 기록\n        final_results.append({\n            \"status\": \"success\",\n            \"file_name\": f_name,\n            \"file_size\": f\"{file_size_mb} MB\",\n            \"stats\": stats\n        })\n\n    except Exception as e:\n        final_results.append({\n            \"status\": \"error\",\n            \"file_name\": f_name,\n            \"message\": str(e)\n        })\n\n    finally:\n        # 즉시 삭제\n        if tmp_path and os.path.exists(tmp_path):\n            os.remove(tmp_path)\n\nreturn final_results"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        256
+      ],
+      "id": "5811e1a0-9abf-4b81-b339-951b13847473",
+      "name": "RAGWire1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<report>\n{{ $json.data }}\n</report>",
+        "options": {
+          "systemMessage": "너는 주식 리포트 URL을 추출하는 API 서버야.\n\n[지시사항]\n1. <report> 태그 안에서 PDF URL만 모두 추출한다.\n2. 반드시 유효한 JSON 형식으로만 응답한다.\n3. 어떠한 설명, 인사말, 마크다운 코드블록(```json)도 절대 포함하지 마라.\n4. 응답은 반드시 '{'로 시작해서 '}'로 끝나야 한다.\n5. 결과값에 줄바꿈 기호(\\n)나 이스케이프 문자를 넣지 말고, 순수 데이터만 출력하라.\n\n[출력 형식]\n{\"urls\":[\"링크1\",\"링크2\"]}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        832,
+        608
+      ],
+      "id": "90a606b6-394c-413b-a459-9016e880861b",
+      "name": "AI Agent2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 2026년 한국 공휴일 목록 (이미지 참고 반영)\nconst holidays2026 = [\n  \"2026-01-01\", // 신정\n  \"2026-02-16\", \"2026-02-17\", \"2026-02-18\", // 설날 연휴\n  \"2026-03-01\", \"2026-03-02\", // 3.1절 및 대체공휴일\n  \"2026-05-05\", // 어린이날\n  \"2026-05-24\", \"2026-05-25\", // 부처님 오신 날 및 대체공휴일\n  \"2026-06-06\", // 현충일\n  \"2026-08-15\", \"2026-08-17\", // 광복절 및 대체공휴일\n  \"2026-09-24\", \"2026-09-25\", \"2026-09-26\", // 추석 연휴\n  \"2026-10-03\", \"2026-10-05\", // 개천절 및 대체공휴일\n  \"2026-10-09\", // 한글날\n  \"2026-12-25\", // 크리스마스\n];\n\n// 현재 시간 기준 KST(한국 표준시) 계산\nconst now = new Date();\nconst kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));\n\nconst year = kstDate.getUTCFullYear();\nconst month = String(kstDate.getUTCMonth() + 1).padStart(2, '0');\nconst day = String(kstDate.getUTCDate()).padStart(2, '0');\nconst dateString = `${year}-${month}-${day}`;\n\nconst hours = kstDate.getUTCHours();\nconst minutes = kstDate.getUTCMinutes();\nconst dayOfWeek = kstDate.getUTCDay(); // 0: 일요일, 6: 토요일\n\n// 1. 주말 체크\nconst isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);\n\n// 2. 공휴일 체크\nconst isHoliday = holidays2026.includes(dateString);\n\n// 3. 업무 시간 체크 (08:30 ~ 18:30)\nconst currentTimeInMinutes = (hours * 60) + minutes;\nconst startMinutes = (8 * 60) + 30;\nconst endMinutes = (18 * 60) + 30;\nconst isBusinessHours = (currentTimeInMinutes >= startMinutes && currentTimeInMinutes <= endMinutes);\n\n// 최종 실행 여부 결정\nconst shouldRun = !isWeekend && !isHoliday && isBusinessHours;\n\nreturn {\n  shouldRun,\n  status: shouldRun ? \"정상 작동\" : \"중단 (주말/휴일/시간외)\",\n  debug: {\n    kstTime: `${hours}:${minutes}`,\n    date: dateString,\n    day: [\"일\", \"월\", \"화\", \"수\", \"목\", \"금\", \"토\"][dayOfWeek]\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        624
+      ],
+      "id": "fbd37451-b54e-4536-aa4e-37a85d639121",
+      "name": "시간 확인(26년)2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "15fc0bbc-70dc-4e69-b7b2-3f39bece14a3",
+              "leftValue": "={{ $json.shouldRun }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        624
+      ],
+      "id": "d91a5a7f-2794-406f-b87b-97532cbb80e6",
+      "name": "실행 여부2"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        832,
+        784
+      ],
+      "id": "61da003b-08b9-4eaf-bc94-979fd7573a50",
+      "name": "Google Gemini Chat Model2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ab6gK9S7PzkIz7ya",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1296,
+        608
+      ],
+      "id": "43511d9a-f308-4e74-b29d-af93b94c92aa",
+      "name": "PDF 다운로드2",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// AI가 내뱉은 텍스트(output)를 가져옵니다.\nconst rawText = $input.item.json.output;\n\ntry {\n  // 1. JSON 파싱\n  const parsedData = JSON.parse(rawText);\n  \n  // 2. urls 배열 내의 각 링크를 n8n이 인식할 수 있는 개별 아이템 형태로 변환\n  // [ { json: { url: \"링크1\" } }, { json: { url: \"링크2\" } } ] 형태로 반환됩니다.\n  return parsedData.urls.map(url => {\n    return {\n      url: url\n    };\n  });\n\n} catch (error) {\n  // 에러 발생 시 추적을 위해 원본 텍스트 반환\n  return [{\n    error: \"JSON 파싱 실패\",\n    rawText: rawText\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        608
+      ],
+      "id": "ce775587-8314-40af-9032-f586cd305f6a",
+      "name": "URL 파싱2"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "import os\nimport tempfile\nimport base64\nfrom dotenv import load_dotenv\nfrom ragwire import RAGWire, setup_logging\n\n# 환경 설정\nload_dotenv(\"/config/.env\")\n\nlogger = setup_logging(log_level=\"INFO\")\nrag = RAGWire('/config/industry_config.yaml') \n\nfinal_results = []\n\nfor i, item in enumerate(_items):\n    f_name = \"unknown\"\n    tmp_path = None\n    file_size_mb = 0\n    try:\n        # 1. 데이터 가져오기\n        json_data = item.get('json', {})\n        b64_string = json_data.get('data')\n        f_name = json_data.get('fileName', f'doc_{i}.pdf')\n\n        if not b64_string:\n            continue\n\n        # 2. 파일 복원\n        file_bytes = base64.b64decode(b64_string)\n\n        # 3. 임시 파일 저장 및 용량 계산\n        with tempfile.NamedTemporaryFile(delete=False, suffix=\".pdf\") as tmp:\n            tmp.write(file_bytes)\n            tmp_path = tmp.name\n            \n        # 파일 크기 측정 (Bytes -> MB)\n        size_bytes = os.path.getsize(tmp_path)\n        file_size_mb = round(size_bytes / (1024 * 1024), 2)\n\n        # 4. RAG 주입\n        stats = rag.ingest_documents([tmp_path])\n\n        # 5. 결과 기록\n        final_results.append({\n            \"status\": \"success\",\n            \"file_name\": f_name,\n            \"file_size\": f\"{file_size_mb} MB\",\n            \"stats\": stats\n        })\n\n    except Exception as e:\n        final_results.append({\n            \"status\": \"error\",\n            \"file_name\": f_name,\n            \"message\": str(e)\n        })\n\n    finally:\n        # 즉시 삭제\n        if tmp_path and os.path.exists(tmp_path):\n            os.remove(tmp_path)\n\nreturn final_results"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        608
+      ],
+      "id": "d56f9954-8fa7-4206-9147-458dcda83a33",
+      "name": "RAGWire2"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<report>\n{{ $json.data }}\n</report>",
+        "options": {
+          "systemMessage": "너는 주식 리포트 URL을 추출하는 API 서버야.\n\n[지시사항]\n1. <report> 태그 안에서 PDF URL만 모두 추출한다.\n2. 반드시 유효한 JSON 형식으로만 응답한다.\n3. 어떠한 설명, 인사말, 마크다운 코드블록(```json)도 절대 포함하지 마라.\n4. 응답은 반드시 '{'로 시작해서 '}'로 끝나야 한다.\n5. 결과값에 줄바꿈 기호(\\n)나 이스케이프 문자를 넣지 말고, 순수 데이터만 출력하라.\n\n[출력 형식]\n{\"urls\":[\"링크1\",\"링크2\"]}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        832,
+        944
+      ],
+      "id": "6d367078-8509-47b5-bc2f-8843fc83164d",
+      "name": "AI Agent3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 2026년 한국 공휴일 목록 (이미지 참고 반영)\nconst holidays2026 = [\n  \"2026-01-01\", // 신정\n  \"2026-02-16\", \"2026-02-17\", \"2026-02-18\", // 설날 연휴\n  \"2026-03-01\", \"2026-03-02\", // 3.1절 및 대체공휴일\n  \"2026-05-05\", // 어린이날\n  \"2026-05-24\", \"2026-05-25\", // 부처님 오신 날 및 대체공휴일\n  \"2026-06-06\", // 현충일\n  \"2026-08-15\", \"2026-08-17\", // 광복절 및 대체공휴일\n  \"2026-09-24\", \"2026-09-25\", \"2026-09-26\", // 추석 연휴\n  \"2026-10-03\", \"2026-10-05\", // 개천절 및 대체공휴일\n  \"2026-10-09\", // 한글날\n  \"2026-12-25\", // 크리스마스\n];\n\n// 현재 시간 기준 KST(한국 표준시) 계산\nconst now = new Date();\nconst kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));\n\nconst year = kstDate.getUTCFullYear();\nconst month = String(kstDate.getUTCMonth() + 1).padStart(2, '0');\nconst day = String(kstDate.getUTCDate()).padStart(2, '0');\nconst dateString = `${year}-${month}-${day}`;\n\nconst hours = kstDate.getUTCHours();\nconst minutes = kstDate.getUTCMinutes();\nconst dayOfWeek = kstDate.getUTCDay(); // 0: 일요일, 6: 토요일\n\n// 1. 주말 체크\nconst isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);\n\n// 2. 공휴일 체크\nconst isHoliday = holidays2026.includes(dateString);\n\n// 3. 업무 시간 체크 (08:30 ~ 18:30)\nconst currentTimeInMinutes = (hours * 60) + minutes;\nconst startMinutes = (8 * 60) + 30;\nconst endMinutes = (18 * 60) + 30;\nconst isBusinessHours = (currentTimeInMinutes >= startMinutes && currentTimeInMinutes <= endMinutes);\n\n// 최종 실행 여부 결정\nconst shouldRun = !isWeekend && !isHoliday && isBusinessHours;\n\nreturn {\n  shouldRun,\n  status: shouldRun ? \"정상 작동\" : \"중단 (주말/휴일/시간외)\",\n  debug: {\n    kstTime: `${hours}:${minutes}`,\n    date: dateString,\n    day: [\"일\", \"월\", \"화\", \"수\", \"목\", \"금\", \"토\"][dayOfWeek]\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        960
+      ],
+      "id": "b1ae9449-ed88-4989-aa68-c0665137b127",
+      "name": "시간 확인(26년)3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "15fc0bbc-70dc-4e69-b7b2-3f39bece14a3",
+              "leftValue": "={{ $json.shouldRun }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        960
+      ],
+      "id": "4f066f64-187c-494e-b614-2afb0eaa9bb9",
+      "name": "실행 여부3"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        832,
+        1120
+      ],
+      "id": "26b84e3a-7e63-448f-8d3c-ef481def5118",
+      "name": "Google Gemini Chat Model3",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ab6gK9S7PzkIz7ya",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1296,
+        944
+      ],
+      "id": "7a0ed30e-df9d-41c6-84c5-3a809800c88c",
+      "name": "PDF 다운로드3",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// AI가 내뱉은 텍스트(output)를 가져옵니다.\nconst rawText = $input.item.json.output;\n\ntry {\n  // 1. JSON 파싱\n  const parsedData = JSON.parse(rawText);\n  \n  // 2. urls 배열 내의 각 링크를 n8n이 인식할 수 있는 개별 아이템 형태로 변환\n  // [ { json: { url: \"링크1\" } }, { json: { url: \"링크2\" } } ] 형태로 반환됩니다.\n  return parsedData.urls.map(url => {\n    return {\n      url: url\n    };\n  });\n\n} catch (error) {\n  // 에러 발생 시 추적을 위해 원본 텍스트 반환\n  return [{\n    error: \"JSON 파싱 실패\",\n    rawText: rawText\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        944
+      ],
+      "id": "b0406318-96da-4303-a547-34ee03c09b0a",
+      "name": "URL 파싱3"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "import os\nimport tempfile\nimport base64\nfrom dotenv import load_dotenv\nfrom ragwire import RAGWire, setup_logging\n\n# 환경 설정\nload_dotenv(\"/config/.env\")\n\nlogger = setup_logging(log_level=\"INFO\")\nrag = RAGWire('/config/market_config.yaml') \n\nfinal_results = []\n\nfor i, item in enumerate(_items):\n    f_name = \"unknown\"\n    tmp_path = None\n    file_size_mb = 0\n    try:\n        # 1. 데이터 가져오기\n        json_data = item.get('json', {})\n        b64_string = json_data.get('data')\n        f_name = json_data.get('fileName', f'doc_{i}.pdf')\n\n        if not b64_string:\n            continue\n\n        # 2. 파일 복원\n        file_bytes = base64.b64decode(b64_string)\n\n        # 3. 임시 파일 저장 및 용량 계산\n        with tempfile.NamedTemporaryFile(delete=False, suffix=\".pdf\") as tmp:\n            tmp.write(file_bytes)\n            tmp_path = tmp.name\n            \n        # 파일 크기 측정 (Bytes -> MB)\n        size_bytes = os.path.getsize(tmp_path)\n        file_size_mb = round(size_bytes / (1024 * 1024), 2)\n\n        # 4. RAG 주입\n        stats = rag.ingest_documents([tmp_path])\n\n        # 5. 결과 기록\n        final_results.append({\n            \"status\": \"success\",\n            \"file_name\": f_name,\n            \"file_size\": f\"{file_size_mb} MB\",\n            \"stats\": stats\n        })\n\n    except Exception as e:\n        final_results.append({\n            \"status\": \"error\",\n            \"file_name\": f_name,\n            \"message\": str(e)\n        })\n\n    finally:\n        # 즉시 삭제\n        if tmp_path and os.path.exists(tmp_path):\n            os.remove(tmp_path)\n\nreturn final_results"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        944
+      ],
+      "id": "7e24ee99-84b0-4bbe-ae44-6c7937ea4d29",
+      "name": "RAGWire3"
+    },
+    {
+      "parameters": {
+        "url": "=https://r.jina.ai/https://finance.naver.com/research/market_info_list.naver",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        944
+      ],
+      "id": "5c2a6d90-4baa-4bd7-b866-c33e22445eca",
+      "name": "시황분석 리포트 검색"
+    },
+    {
+      "parameters": {
+        "url": "=https://r.jina.ai/https://finance.naver.com/research/industry_list.naver",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        608
+      ],
+      "id": "76daba38-2f41-4218-b918-82014fa6193b",
+      "name": "산업분석 리포트 검색"
+    },
+    {
+      "parameters": {
+        "url": "=https://r.jina.ai/https://finance.naver.com/research/company_list.naver",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        656,
+        256
+      ],
+      "id": "ec8f833d-7ccf-4ebf-af71-082b290fdbee",
+      "name": "종목분석 리포트 검색"
+    },
+    {
+      "parameters": {
+        "url": "=https://r.jina.ai/https://finance.naver.com/research/invest_list.naver",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        -48
+      ],
+      "id": "201296cc-7d54-414e-81fa-ee318f02a411",
+      "name": "투자정보 리포트 검색"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<report>\n{{ $json.data }}\n</report>",
+        "options": {
+          "systemMessage": "너는 주식 리포트 URL을 추출하는 API 서버야.\n\n[지시사항]\n1. <report> 태그 안에서 PDF URL만 모두 추출한다.\n2. 반드시 유효한 JSON 형식으로만 응답한다.\n3. 어떠한 설명, 인사말, 마크다운 코드블록(```json)도 절대 포함하지 마라.\n4. 응답은 반드시 '{'로 시작해서 '}'로 끝나야 한다.\n5. 결과값에 줄바꿈 기호(\\n)나 이스케이프 문자를 넣지 말고, 순수 데이터만 출력하라.\n\n[출력 형식]\n{\"urls\":[\"링크1\",\"링크2\"]}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        848,
+        1280
+      ],
+      "id": "e36df018-d729-4f1c-80e8-7f87086efd04",
+      "name": "AI Agent4"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 2026년 한국 공휴일 목록 (이미지 참고 반영)\nconst holidays2026 = [\n  \"2026-01-01\", // 신정\n  \"2026-02-16\", \"2026-02-17\", \"2026-02-18\", // 설날 연휴\n  \"2026-03-01\", \"2026-03-02\", // 3.1절 및 대체공휴일\n  \"2026-05-05\", // 어린이날\n  \"2026-05-24\", \"2026-05-25\", // 부처님 오신 날 및 대체공휴일\n  \"2026-06-06\", // 현충일\n  \"2026-08-15\", \"2026-08-17\", // 광복절 및 대체공휴일\n  \"2026-09-24\", \"2026-09-25\", \"2026-09-26\", // 추석 연휴\n  \"2026-10-03\", \"2026-10-05\", // 개천절 및 대체공휴일\n  \"2026-10-09\", // 한글날\n  \"2026-12-25\", // 크리스마스\n];\n\n// 현재 시간 기준 KST(한국 표준시) 계산\nconst now = new Date();\nconst kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));\n\nconst year = kstDate.getUTCFullYear();\nconst month = String(kstDate.getUTCMonth() + 1).padStart(2, '0');\nconst day = String(kstDate.getUTCDate()).padStart(2, '0');\nconst dateString = `${year}-${month}-${day}`;\n\nconst hours = kstDate.getUTCHours();\nconst minutes = kstDate.getUTCMinutes();\nconst dayOfWeek = kstDate.getUTCDay(); // 0: 일요일, 6: 토요일\n\n// 1. 주말 체크\nconst isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);\n\n// 2. 공휴일 체크\nconst isHoliday = holidays2026.includes(dateString);\n\n// 3. 업무 시간 체크 (08:30 ~ 18:30)\nconst currentTimeInMinutes = (hours * 60) + minutes;\nconst startMinutes = (8 * 60) + 30;\nconst endMinutes = (18 * 60) + 30;\nconst isBusinessHours = (currentTimeInMinutes >= startMinutes && currentTimeInMinutes <= endMinutes);\n\n// 최종 실행 여부 결정\nconst shouldRun = !isWeekend && !isHoliday && isBusinessHours;\n\nreturn {\n  shouldRun,\n  status: shouldRun ? \"정상 작동\" : \"중단 (주말/휴일/시간외)\",\n  debug: {\n    kstTime: `${hours}:${minutes}`,\n    date: dateString,\n    day: [\"일\", \"월\", \"화\", \"수\", \"목\", \"금\", \"토\"][dayOfWeek]\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        1296
+      ],
+      "id": "0f7d8f06-63ec-420f-acf3-222caa1231ba",
+      "name": "시간 확인(26년)4"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "15fc0bbc-70dc-4e69-b7b2-3f39bece14a3",
+              "leftValue": "={{ $json.shouldRun }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        464,
+        1296
+      ],
+      "id": "b2a44d99-8430-4519-89ce-29e6199a79a0",
+      "name": "실행 여부4"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        848,
+        1456
+      ],
+      "id": "ede79282-c8f7-45c7-96c4-b22fd8641a75",
+      "name": "Google Gemini Chat Model4",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ab6gK9S7PzkIz7ya",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1312,
+        1280
+      ],
+      "id": "dd8f06c9-0856-45ac-8e70-19078be70289",
+      "name": "PDF 다운로드4",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// AI가 내뱉은 텍스트(output)를 가져옵니다.\nconst rawText = $input.item.json.output;\n\ntry {\n  // 1. JSON 파싱\n  const parsedData = JSON.parse(rawText);\n  \n  // 2. urls 배열 내의 각 링크를 n8n이 인식할 수 있는 개별 아이템 형태로 변환\n  // [ { json: { url: \"링크1\" } }, { json: { url: \"링크2\" } } ] 형태로 반환됩니다.\n  return parsedData.urls.map(url => {\n    return {\n      url: url\n    };\n  });\n\n} catch (error) {\n  // 에러 발생 시 추적을 위해 원본 텍스트 반환\n  return [{\n    error: \"JSON 파싱 실패\",\n    rawText: rawText\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        1280
+      ],
+      "id": "913e280c-0d45-4c48-8660-e7ae3a4f1949",
+      "name": "URL 파싱4"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "import os\nimport tempfile\nimport base64\nfrom dotenv import load_dotenv\nfrom ragwire import RAGWire, setup_logging\n\n# 환경 설정\nload_dotenv(\"/config/.env\")\n\nlogger = setup_logging(log_level=\"INFO\")\nrag = RAGWire('/config/economy_config.yaml') \n\nfinal_results = []\n\nfor i, item in enumerate(_items):\n    f_name = \"unknown\"\n    tmp_path = None\n    file_size_mb = 0\n    try:\n        # 1. 데이터 가져오기\n        json_data = item.get('json', {})\n        b64_string = json_data.get('data')\n        f_name = json_data.get('fileName', f'doc_{i}.pdf')\n\n        if not b64_string:\n            continue\n\n        # 2. 파일 복원\n        file_bytes = base64.b64decode(b64_string)\n\n        # 3. 임시 파일 저장 및 용량 계산\n        with tempfile.NamedTemporaryFile(delete=False, suffix=\".pdf\") as tmp:\n            tmp.write(file_bytes)\n            tmp_path = tmp.name\n            \n        # 파일 크기 측정 (Bytes -> MB)\n        size_bytes = os.path.getsize(tmp_path)\n        file_size_mb = round(size_bytes / (1024 * 1024), 2)\n\n        # 4. RAG 주입\n        stats = rag.ingest_documents([tmp_path])\n\n        # 5. 결과 기록\n        final_results.append({\n            \"status\": \"success\",\n            \"file_name\": f_name,\n            \"file_size\": f\"{file_size_mb} MB\",\n            \"stats\": stats\n        })\n\n    except Exception as e:\n        final_results.append({\n            \"status\": \"error\",\n            \"file_name\": f_name,\n            \"message\": str(e)\n        })\n\n    finally:\n        # 즉시 삭제\n        if tmp_path and os.path.exists(tmp_path):\n            os.remove(tmp_path)\n\nreturn final_results"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        1280
+      ],
+      "id": "ff16a775-7fb1-45df-8f55-ddfc6c6ff93c",
+      "name": "RAGWire4"
+    },
+    {
+      "parameters": {
+        "url": "=https://r.jina.ai/https://finance.naver.com/research/economy_list.naver",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        688,
+        1280
+      ],
+      "id": "08ccfe60-386c-420b-a5a3-04fa45715b78",
+      "name": "경제분석 리포트 검색"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10,14 * * 1-5"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        128,
+        272
+      ],
+      "id": "3d930b1c-9e05-4a66-b3c0-3725f0859819",
+      "name": "종목분석 수집기 트리거"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10,14 * * 1-5"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        144,
+        -32
+      ],
+      "id": "748b8774-c9ff-4973-a9d4-68e460d45522",
+      "name": "투자정보 수집기 트리거"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10,14 * * 1-5"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        144,
+        624
+      ],
+      "id": "c9be193f-4780-4d8c-b831-17214a1c4b9a",
+      "name": "산업분석 수집기 트리거"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10,14 * * 1-5"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        144,
+        960
+      ],
+      "id": "69960b12-837b-49b9-93cd-877017e5886c",
+      "name": "시황분석 수집기 트리거"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10,14 * * 1-5"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        160,
+        1296
+      ],
+      "id": "d0fd50e1-c745-448a-86fc-501faae864df",
+      "name": "경제분석 수집기 트리거"
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        608
+      ],
+      "id": "1762ec0d-403a-4381-9610-33d166d55e54",
+      "name": "Base64 변환2"
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        944
+      ],
+      "id": "8c929a3a-480f-4ea7-9cbd-eb1f24117f33",
+      "name": "Base64 변환3"
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1456,
+        1280
+      ],
+      "id": "d266ebdc-478a-4c37-bb44-22e5be1fa41e",
+      "name": "Base64 변환4"
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1424,
+        256
+      ],
+      "id": "32b31117-d7bf-4b10-a01d-2fbfb94100b0",
+      "name": "Base64 변환1"
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        -48
+      ],
+      "id": "402c9aaf-5a4c-4f95-aa04-78aeefab38cb",
+      "name": "Base64 변환",
+      "retryOnFail": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "시간 확인(26년)": {
+      "main": [
+        [
+          {
+            "node": "실행 여부",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "URL 파싱",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "실행 여부": {
+      "main": [
+        [
+          {
+            "node": "투자정보 리포트 검색",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "URL 파싱": {
+      "main": [
+        [
+          {
+            "node": "PDF 다운로드",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF 다운로드": {
+      "main": [
+        [
+          {
+            "node": "Base64 변환",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "URL 파싱1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "시간 확인(26년)1": {
+      "main": [
+        [
+          {
+            "node": "실행 여부1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "실행 여부1": {
+      "main": [
+        [
+          {
+            "node": "종목분석 리포트 검색",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF 다운로드1": {
+      "main": [
+        [
+          {
+            "node": "Base64 변환1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "URL 파싱1": {
+      "main": [
+        [
+          {
+            "node": "PDF 다운로드1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent2": {
+      "main": [
+        [
+          {
+            "node": "URL 파싱2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "시간 확인(26년)2": {
+      "main": [
+        [
+          {
+            "node": "실행 여부2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "실행 여부2": {
+      "main": [
+        [
+          {
+            "node": "산업분석 리포트 검색",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF 다운로드2": {
+      "main": [
+        [
+          {
+            "node": "Base64 변환2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "URL 파싱2": {
+      "main": [
+        [
+          {
+            "node": "PDF 다운로드2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent3": {
+      "main": [
+        [
+          {
+            "node": "URL 파싱3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "시간 확인(26년)3": {
+      "main": [
+        [
+          {
+            "node": "실행 여부3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "실행 여부3": {
+      "main": [
+        [
+          {
+            "node": "시황분석 리포트 검색",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent3",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF 다운로드3": {
+      "main": [
+        [
+          {
+            "node": "Base64 변환3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "URL 파싱3": {
+      "main": [
+        [
+          {
+            "node": "PDF 다운로드3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "시황분석 리포트 검색": {
+      "main": [
+        [
+          {
+            "node": "AI Agent3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "산업분석 리포트 검색": {
+      "main": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "종목분석 리포트 검색": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "투자정보 리포트 검색": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent4": {
+      "main": [
+        [
+          {
+            "node": "URL 파싱4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "시간 확인(26년)4": {
+      "main": [
+        [
+          {
+            "node": "실행 여부4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "실행 여부4": {
+      "main": [
+        [
+          {
+            "node": "경제분석 리포트 검색",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model4": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent4",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF 다운로드4": {
+      "main": [
+        [
+          {
+            "node": "Base64 변환4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "URL 파싱4": {
+      "main": [
+        [
+          {
+            "node": "PDF 다운로드4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "경제분석 리포트 검색": {
+      "main": [
+        [
+          {
+            "node": "AI Agent4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "종목분석 수집기 트리거": {
+      "main": [
+        [
+          {
+            "node": "시간 확인(26년)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "투자정보 수집기 트리거": {
+      "main": [
+        [
+          {
+            "node": "시간 확인(26년)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "산업분석 수집기 트리거": {
+      "main": [
+        [
+          {
+            "node": "시간 확인(26년)2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "시황분석 수집기 트리거": {
+      "main": [
+        [
+          {
+            "node": "시간 확인(26년)3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "경제분석 수집기 트리거": {
+      "main": [
+        [
+          {
+            "node": "시간 확인(26년)4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base64 변환2": {
+      "main": [
+        [
+          {
+            "node": "RAGWire2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base64 변환3": {
+      "main": [
+        [
+          {
+            "node": "RAGWire3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base64 변환4": {
+      "main": [
+        [
+          {
+            "node": "RAGWire4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base64 변환1": {
+      "main": [
+        [
+          {
+            "node": "RAGWire1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base64 변환": {
+      "main": [
+        [
+          {
+            "node": "RAGWire",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "b4f77e2e-0308-46ac-97af-47c879913c9d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "811ce48b6a60f3b27a31c330d393ee64ddc5d6e51c3ad80cc79fdd1e430be2f5"
+  },
+  "id": "RQNF3MXSH3EwK9KD",
+  "tags": []
+}

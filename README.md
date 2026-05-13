@@ -265,7 +265,7 @@ docker compose up -d
 
 **6단계: Workflow 임포트**
 
-n8n 화면에서 새 워크플로우를 생성한 후, 우측 상단의 [...] 메뉴 -> [Import from File]을 클릭하여 `n8n/workflow/` 폴더의 json 파일을 선택합니다.
+n8n 화면에서 새 워크플로우를 생성한 후, 우측 상단의 [...] 메뉴 -> [Import from File]을 클릭하여 `n8n/workflow/` 폴더의 json 파일을 임포트합니다.
 
 **7단계: Credentials (자격 증명) 등록**
 

@@ -1,0 +1,227 @@
+{
+  "name": "산업분석 리서치 수집기",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=https://r.jina.ai/https://finance.naver.com/research/industry_list.naver",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "e04aa3a3-03b2-42bd-8f10-363e7af85416",
+      "name": "산업분석 리포트 검색"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -176,
+        0
+      ],
+      "id": "506baef2-3c5c-4bc8-bb50-d18c2f4272b5",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<report>\n{{ $json.data }}\n</report>",
+        "options": {
+          "systemMessage": "너는 주식 리포트 URL을 추출하는 API 서버야.\n\n[지시사항]\n1. <report> 태그 안에서 PDF URL만 모두 추출한다.\n2. 반드시 유효한 JSON 형식으로만 응답한다.\n3. 어떠한 설명, 인사말, 마크다운 코드블록(```json)도 절대 포함하지 마라.\n4. 응답은 반드시 '{'로 시작해서 '}'로 끝나야 한다.\n5. 결과값에 줄바꿈 기호(\\n)나 이스케이프 문자를 넣지 말고, 순수 데이터만 출력하라.\n\n[출력 형식]\n{\"urls\":[\"링크1\",\"링크2\"]}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        160,
+        0
+      ],
+      "id": "06f733c2-5cd9-44b1-aa6a-7cf11bb64d14",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        160,
+        176
+      ],
+      "id": "46a18d87-622d-4615-84fc-f5b286cf852c",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ab6gK9S7PzkIz7ya",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// AI가 내뱉은 텍스트(output)를 가져옵니다.\nconst rawText = $input.item.json.output;\n\ntry {\n  // 1. JSON 파싱\n  const parsedData = JSON.parse(rawText);\n  \n  // 2. urls 배열 내의 각 링크를 n8n이 인식할 수 있는 개별 아이템 형태로 변환\n  // [ { json: { url: \"링크1\" } }, { json: { url: \"링크2\" } } ] 형태로 반환됩니다.\n  return parsedData.urls.map(url => {\n    return {\n      url: url\n    };\n  });\n\n} catch (error) {\n  // 에러 발생 시 추적을 위해 원본 텍스트 반환\n  return [{\n    error: \"JSON 파싱 실패\",\n    rawText: rawText\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        0
+      ],
+      "id": "9b4a7a21-f8ea-4e3a-a3cc-d43c6487f021",
+      "name": "URL 파싱"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        624,
+        0
+      ],
+      "id": "73f337e1-8929-40dc-a8b5-600f07e6149f",
+      "name": "PDF 다운로드",
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        912,
+        -16
+      ],
+      "id": "92e65e12-06db-4a3c-b40a-8aede29534e8",
+      "name": "Base64 변환"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "import os\nimport tempfile\nimport base64\nfrom dotenv import load_dotenv\nfrom ragwire import RAGWire, setup_logging\n\n# 환경 설정\nload_dotenv(\"/config/.env\")\n\nlogger = setup_logging(log_level=\"INFO\")\nrag = RAGWire('/config/industry_config.yaml') \n\nfinal_results = []\n\nfor i, item in enumerate(_items):\n    f_name = \"unknown\"\n    tmp_path = None\n    file_size_mb = 0\n    try:\n        # 1. 데이터 가져오기\n        json_data = item.get('json', {})\n        b64_string = json_data.get('data')\n        f_name = json_data.get('fileName', f'doc_{i}.pdf')\n\n        if not b64_string:\n            continue\n\n        # 2. 파일 복원\n        file_bytes = base64.b64decode(b64_string)\n\n        # 3. 임시 파일 저장 및 용량 계산\n        with tempfile.NamedTemporaryFile(delete=False, suffix=\".pdf\") as tmp:\n            tmp.write(file_bytes)\n            tmp_path = tmp.name\n            \n        # 파일 크기 측정 (Bytes -> MB)\n        size_bytes = os.path.getsize(tmp_path)\n        file_size_mb = round(size_bytes / (1024 * 1024), 2)\n\n        # 4. RAG 주입\n        stats = rag.ingest_documents([tmp_path])\n\n        # 5. 결과 기록\n        final_results.append({\n            \"status\": \"success\",\n            \"file_name\": f_name,\n            \"file_size\": f\"{file_size_mb} MB\",\n            \"stats\": stats\n        })\n\n    except Exception as e:\n        final_results.append({\n            \"status\": \"error\",\n            \"file_name\": f_name,\n            \"message\": str(e)\n        })\n\n    finally:\n        # 즉시 삭제\n        if tmp_path and os.path.exists(tmp_path):\n            os.remove(tmp_path)\n\nreturn final_results"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        -16
+      ],
+      "id": "391f1d98-0505-4f46-94fc-3f3e29a95d78",
+      "name": "RAGWire"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "산업분석 리포트 검색": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "산업분석 리포트 검색",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "URL 파싱",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "URL 파싱": {
+      "main": [
+        [
+          {
+            "node": "PDF 다운로드",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF 다운로드": {
+      "main": [
+        [
+          {
+            "node": "Base64 변환",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base64 변환": {
+      "main": [
+        [
+          {
+            "node": "RAGWire",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "1fb44fc8-6e0d-4451-a9e1-e9a4c0082432",
+  "meta": {
+    "instanceId": "811ce48b6a60f3b27a31c330d393ee64ddc5d6e51c3ad80cc79fdd1e430be2f5"
+  },
+  "id": "LLRx7OwSBNF73alt",
+  "tags": []
+}

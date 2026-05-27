@@ -60,4 +60,6 @@ services:
 
 volumes:
   n8n_data:
+    external: true
   qdrant_data:
+    external: true

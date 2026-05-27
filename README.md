@@ -253,9 +253,11 @@ cp ./n8n-runner/config/.env_example ./n8n-runner/config/.env # Gemini API Key
 ```
 복사된 각 `.env` 파일을 열어 API 키와 이메일 정보를 입력하세요.
 
-**4단계: Docker 컨테이너 실행**
+**4단계: Docker 컨테이너 볼륨 생성 및 실행**
 
 ```bash
+docker volume create n8n_data
+docker volume create qdrant_data
 docker compose up -d
 ```
 
